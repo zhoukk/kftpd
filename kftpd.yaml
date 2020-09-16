@@ -1,0 +1,99 @@
+#
+# KFtpd Configuration File
+#
+
+# KFtpd bind address
+# 
+# ENV KFTPD_BIND
+Bind: :21
+
+# KFtpd storage driver, support file and minio
+# 
+# ENV KFTPD_DRIVER
+Driver: file
+
+# KFtpd enable debug
+#
+# ENV KFTPD_DEBUG
+Debug: true
+
+#
+# KFtpd Pasv port range Configuration.
+#
+PasvPort:
+  # KFtpd pasv port start
+  #
+  # ENV KFTPD_PASVPORT_START
+  Start: 21000
+
+  # KFtpd pasv port end
+  #
+  # ENV KFTPD_PASVPORT_END
+  End: 21100
+
+#
+# KFtpd File Driver Configuration.
+#
+FileDriver:
+
+  # KFtpd file driver root dir.
+  #
+  # ENV KFTPD_FILEDRIVER_ROOTPATH
+  RootPath: kftpd-data
+
+#
+# KFtpd Minio Driver Configuration.
+#
+MinioDriver:
+
+  # The endpoint of minio.
+  #
+  # ENV KFTPD_MINIODRIVER_ENDPOINT
+  Endpoint: 127.0.0.1:9000
+  
+  # The accessKeyID of minio.
+  #
+  # ENV KFTPD_MINIODRIVER_ACCESSKEYID
+  AccessKeyID: minioadmin
+  
+  # The secretAccessKey of minio.
+  #
+  # ENV KFTPD_MINIODRIVER_SECRETACCESSKEY
+  SecretAccessKey: minioadmin
+  
+  # The bucket of minio
+  #
+  # ENV KFTPD_MINIODRIVER_BUCKET
+  Bucket: kftpd-data
+
+  # Whether use ssl with minio
+  #
+  # ENV KFTPD_MINIODRIVER_USESSL
+  UseSSL: false
+
+#
+# KFtpd Auth TLS Configuration.
+#
+AuthTLS:
+
+  # Whether enable AUTH TLS.
+  #
+  # ENV KFTPD_AUTHTLS_ENABLE
+  Enable: false
+
+  # The TLS cert file.
+  #
+  # ENV KFTPD_AUTHTLS_CERTFILE
+  CertFile: 
+
+  # The TLS key file.
+  #
+  # ENV KFTPD_AUTHTLS_KEYFILE
+  KeyFile:
+
+
+# KFtpd Users Configuration.
+#
+# ENV KFTPD_USERS
+Users:
+  kftpd: kftpd
