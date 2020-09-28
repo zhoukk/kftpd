@@ -24,7 +24,7 @@ Pasv:
   # KFtpd pasv ip for client
   #
   # ENV KFTPD_PASV_IP
-  IP: 
+  IP:
 
   # KFtpd pasv port start
   #
@@ -35,6 +35,11 @@ Pasv:
   #
   # ENV KFTPD_PASV_PORTEND
   PortEnd: 21100
+
+  # KFtpd pasv listen timeout
+  #
+  # ENV KFTPD_PASV_LISTENTIMEOUT
+  ListenTimeout: 10
 
 #
 # KFtpd File Driver Configuration.

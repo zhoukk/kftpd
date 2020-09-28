@@ -33,9 +33,10 @@ type FtpdConfig struct {
 	Debug  bool   `yaml:"Debug,omitempty"`
 
 	Pasv struct {
-		IP        string `yaml:"IP,omitempty"`
-		PortStart int    `yaml:"PortStart,omitempty"`
-		PortEnd   int    `yaml:"PortEnd,omitempty"`
+		IP            string `yaml:"IP,omitempty"`
+		PortStart     int    `yaml:"PortStart,omitempty"`
+		PortEnd       int    `yaml:"PortEnd,omitempty"`
+		ListenTimeout int    `yaml:"ListenTimeout,omitempty"`
 	} `yaml:"Pasv,omitempty"`
 
 	FileDriver struct {
@@ -1211,6 +1212,7 @@ func (fc *FtpConn) pasvListen() (*net.TCPListener, error) {
 		}
 		listener, err := net.ListenTCP("tcp", laddr)
 		if err == nil {
+			listener.SetDeadline(time.Now().Add(time.Duration(fc.config.Pasv.ListenTimeout) * time.Second))
 			return listener, err
 		}
 	}
@@ -1296,9 +1298,6 @@ func (fc *FtpConn) Serve() {
 	for {
 		line, _, err := fc.reader.ReadLine()
 		if err != nil {
-			if err != io.EOF {
-				log.Printf("read failed, err: %v\n", err)
-			}
 			break
 		}
 		if len(line) == 0 {
@@ -1350,6 +1349,7 @@ func NewFtpdConfig(configFile string) (*FtpdConfig, error) {
 	cfg.Pasv.IP = ""
 	cfg.Pasv.PortStart = 21000
 	cfg.Pasv.PortEnd = 21100
+	cfg.Pasv.ListenTimeout = 10
 
 	cfg.FileDriver.RootPath = "kftpd-data"
 
@@ -1401,6 +1401,10 @@ func NewFtpdConfig(configFile string) (*FtpdConfig, error) {
 
 	if env, ok := os.LookupEnv("KFTPD_PASV_PORTEND"); ok {
 		cfg.Pasv.PortEnd, _ = strconv.Atoi(env)
+	}
+
+	if env, ok := os.LookupEnv("KFTPD_PASV_LISTENTIMEOUT"); ok {
+		cfg.Pasv.ListenTimeout, _ = strconv.Atoi(env)
 	}
 
 	if env, ok := os.LookupEnv("KFTPD_FILEDRIVER_ROOTPATH"); ok {
