@@ -850,8 +850,12 @@ func (fc *FtpConn) handleSTOR() error {
 		fc.offset = 0
 		fc.CloseFileTransfer()
 	}()
-	fc.Send(150, "Ok to send data.")
 	reader := fc.GetFileTransfer()
+	if reader == nil {
+		fc.Send(550, "Failed to open transfer.")
+		return nil
+	}
+	fc.Send(150, "Ok to send data.")
 	_, err := fc.driver.PutFile(path, fc.offset, reader)
 	if err != nil {
 		fc.Send(426, "Failure reading network stream.")
