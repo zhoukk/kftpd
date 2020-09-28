@@ -18,18 +18,23 @@ Driver: file
 Debug: true
 
 #
-# KFtpd Pasv port range Configuration.
+# KFtpd Pasv ip and port range Configuration.
 #
-PasvPort:
+Pasv:
+  # KFtpd pasv ip for client
+  #
+  # ENV KFTPD_PASV_IP
+  IP: 
+
   # KFtpd pasv port start
   #
-  # ENV KFTPD_PASVPORT_START
-  Start: 21000
+  # ENV KFTPD_PASV_PORTSTART
+  PortStart: 21000
 
   # KFtpd pasv port end
   #
-  # ENV KFTPD_PASVPORT_END
-  End: 21100
+  # ENV KFTPD_PASV_PORTEND
+  PortEnd: 21100
 
 #
 # KFtpd File Driver Configuration.

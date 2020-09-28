@@ -32,10 +32,11 @@ type FtpdConfig struct {
 	Driver string `yaml:"Driver,omitempty"`
 	Debug  bool   `yaml:"Debug,omitempty"`
 
-	PasvPort struct {
-		Start int `yaml:"Start,omitempty"`
-		End   int `yaml:"End,omitempty"`
-	} `yaml:"PasvPort,omitempty"`
+	Pasv struct {
+		IP        string `yaml:"IP,omitempty"`
+		PortStart int    `yaml:"PortStart,omitempty"`
+		PortEnd   int    `yaml:"PortEnd,omitempty"`
+	} `yaml:"Pasv,omitempty"`
 
 	FileDriver struct {
 		RootPath string `yaml:"RootPath,omitempty"`
@@ -1104,7 +1105,10 @@ func (fc *FtpConn) handlePASV() error {
 		listener.Close()
 	}()
 
-	ip := fc.ctrlConn.LocalAddr().(*net.TCPAddr).IP.String()
+	ip := fc.config.Pasv.IP
+	if len(ip) == 0 {
+		ip = fc.ctrlConn.LocalAddr().(*net.TCPAddr).IP.String()
+	}
 	port := listener.Addr().(*net.TCPAddr).Port
 	quads := strings.Split(ip, ".")
 	p1 := port / 256
@@ -1191,7 +1195,7 @@ func (fc *FtpConn) quote(s string) string {
 }
 
 func (fc *FtpConn) pasvListen() (*net.TCPListener, error) {
-	nAttempts := fc.config.PasvPort.End - fc.config.PasvPort.Start
+	nAttempts := fc.config.Pasv.PortEnd - fc.config.Pasv.PortStart
 
 	if nAttempts < 10 {
 		nAttempts = 10
@@ -1200,7 +1204,7 @@ func (fc *FtpConn) pasvListen() (*net.TCPListener, error) {
 	}
 
 	for i := 0; i < nAttempts; i++ {
-		port := fc.config.PasvPort.Start + rand.Intn(nAttempts+1)
+		port := fc.config.Pasv.PortStart + rand.Intn(nAttempts+1)
 		laddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf(":%d", port))
 		if err != nil {
 			return nil, err
@@ -1343,8 +1347,9 @@ func NewFtpdConfig(configFile string) (*FtpdConfig, error) {
 	cfg.Driver = "file"
 	cfg.Debug = true
 
-	cfg.PasvPort.Start = 21000
-	cfg.PasvPort.End = 21100
+	cfg.Pasv.IP = ""
+	cfg.Pasv.PortStart = 21000
+	cfg.Pasv.PortEnd = 21100
 
 	cfg.FileDriver.RootPath = "kftpd-data"
 
@@ -1386,12 +1391,16 @@ func NewFtpdConfig(configFile string) (*FtpdConfig, error) {
 		cfg.Debug, _ = strconv.ParseBool(env)
 	}
 
-	if env, ok := os.LookupEnv("KFTPD_PASVPORT_START"); ok {
-		cfg.PasvPort.Start, _ = strconv.Atoi(env)
+	if env, ok := os.LookupEnv("KFTPD_PASV_IP"); ok {
+		cfg.Pasv.IP = env
 	}
 
-	if env, ok := os.LookupEnv("KFTPD_PASVPORT_END"); ok {
-		cfg.PasvPort.End, _ = strconv.Atoi(env)
+	if env, ok := os.LookupEnv("KFTPD_PASV_PORTSTART"); ok {
+		cfg.Pasv.PortStart, _ = strconv.Atoi(env)
+	}
+
+	if env, ok := os.LookupEnv("KFTPD_PASV_PORTEND"); ok {
+		cfg.Pasv.PortEnd, _ = strconv.Atoi(env)
 	}
 
 	if env, ok := os.LookupEnv("KFTPD_FILEDRIVER_ROOTPATH"); ok {
