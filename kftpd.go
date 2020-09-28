@@ -14,7 +14,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -1465,8 +1464,6 @@ func main() {
 	var configFile string
 	flag.StringVar(&configFile, "c", "kftpd.yaml", "config file")
 	flag.Parse()
-
-	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	config, err := NewFtpdConfig(configFile)
 	if err != nil {
