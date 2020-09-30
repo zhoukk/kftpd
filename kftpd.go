@@ -870,7 +870,9 @@ func (fc *FtpConn) handleSTOR() error {
 		return err
 	}
 	fc.Send(226, "Transfer complete.")
-	fc.notifier.FileCreate(fc.user, path)
+	if fc.notifier != nil {
+		fc.notifier.FileCreate(fc.user, path)
+	}
 	return nil
 }
 
@@ -901,7 +903,9 @@ func (fc *FtpConn) handleDELE() error {
 		return err
 	}
 	fc.Send(250, "Delete operation successful.")
-	fc.notifier.FileDelete(fc.user, path)
+	if fc.notifier != nil {
+		fc.notifier.FileDelete(fc.user, path)
+	}
 	return nil
 }
 
@@ -934,7 +938,9 @@ func (fc *FtpConn) handleRNTO() error {
 		return err
 	}
 	fc.Send(250, "Rename successful.")
-	fc.notifier.Rename(fc.user, fc.rename, path)
+	if fc.notifier != nil {
+		fc.notifier.Rename(fc.user, fc.rename, path)
+	}
 	return nil
 }
 
@@ -1071,7 +1077,9 @@ func (fc *FtpConn) handleMKD() error {
 		return err
 	}
 	fc.Send(257, fmt.Sprintf(`"%s" created`, fc.quote(path)))
-	fc.notifier.DirCreate(fc.user, path)
+	if fc.notifier != nil {
+		fc.notifier.DirCreate(fc.user, path)
+	}
 	return nil
 }
 
@@ -1084,7 +1092,9 @@ func (fc *FtpConn) handleRMD() error {
 		return err
 	}
 	fc.Send(250, "Remove directory operation successful.")
-	fc.notifier.DirDelete(fc.user, path)
+	if fc.notifier != nil {
+		fc.notifier.DirDelete(fc.user, path)
+	}
 	return nil
 }
 
