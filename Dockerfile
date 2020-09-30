@@ -3,10 +3,11 @@ FROM golang AS gobuilder
 WORKDIR /app
 
 COPY kftpd.go .
+COPY main .
 COPY go.mod .
 COPY go.sum .
 
-RUN go build -tags netgo -ldflags "-linkmode 'external' -extldflags '-static' -w -s" -o kftpd kftpd.go
+RUN go build -tags netgo -ldflags "-linkmode 'external' -extldflags '-static' -w -s" -o kftpd main/main.go
 
 FROM scratch
 COPY --from=gobuilder /app/kftpd .

@@ -1,11 +1,10 @@
-package main
+package kftpd
 
 import (
 	"bufio"
 	"context"
 	"crypto/tls"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -1460,29 +1459,12 @@ func NewFtpdConfig(configFile string) (*FtpdConfig, error) {
 	return &cfg, nil
 }
 
-func main() {
-	var configFile string
-	flag.StringVar(&configFile, "c", "kftpd.yaml", "config file")
-	flag.Parse()
-
-	config, err := NewFtpdConfig(configFile)
-	if err != nil {
-		log.Println(err)
-		flag.Usage()
-		return
-	}
-
-	if config.Debug {
-		log.Printf("%+v\n", config)
-	}
-
+func FtpdServe(config *FtpdConfig) error {
 	var tlsConfig *tls.Config
 	if config.AuthTLS.Enable {
 		cert, err := tls.LoadX509KeyPair(config.AuthTLS.CertFile, config.AuthTLS.KeyFile)
 		if err != nil {
-			log.Println(err)
-			flag.Usage()
-			return
+			return err
 		}
 		tlsConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
 	} else {
@@ -1498,22 +1480,17 @@ func main() {
 		factory = NewMinioDriverFactory(config.MinioDriver.Endpoint, config.MinioDriver.AccessKeyID, config.MinioDriver.SecretAccessKey, config.MinioDriver.Bucket, config.MinioDriver.UseSSL)
 		break
 	default:
-		log.Printf("not supported driver: %s\n", config.Driver)
-		return
+		return fmt.Errorf("not supported driver: %s", config.Driver)
 	}
 
 	listener, err := net.Listen("tcp", config.Bind)
 	if err != nil {
-		log.Printf("listen fail, err: %v\n", err)
-		return
+		return err
 	}
-
-	log.Printf("%s start listen at %s\n", os.Args[0], config.Bind)
 
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Printf("accept fail, err: %v\n", err)
 			continue
 		}
 		go NewFtpConn(conn, config, tlsConfig, factory).Serve()
