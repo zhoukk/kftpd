@@ -1,4 +1,4 @@
-module github.com/minio
+module github.com/zhoukk/kftpd
 
 go 1.14
 
