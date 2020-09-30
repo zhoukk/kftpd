@@ -2,10 +2,7 @@ FROM golang AS gobuilder
 
 WORKDIR /app
 
-COPY kftpd.go .
-COPY main .
-COPY go.mod .
-COPY go.sum .
+COPY . .
 
 RUN go build -tags netgo -ldflags "-linkmode 'external' -extldflags '-static' -w -s" -o kftpd main/main.go
 
