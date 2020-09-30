@@ -89,6 +89,15 @@ type Driver interface {
 	PutFile(string, int64, io.Reader) (int64, error)
 }
 
+// Notifier - notify file or dir create and delete
+type Notifier interface {
+	FileCreate(string, string)
+	FileDelete(string, string)
+	DirCreate(string, string)
+	DirDelete(string, string)
+	Rename(string, string, string)
+}
+
 // MinioDriverFactory - minio driver factory
 type MinioDriverFactory struct {
 	endpoint        string
@@ -564,6 +573,7 @@ type FtpConn struct {
 	tlsConfig *tls.Config
 	factory   DriverFactory
 	driver    Driver
+	notifier  Notifier
 	ctrlConn  net.Conn
 	dataConn  net.Conn
 	reader    *bufio.Reader
@@ -860,6 +870,7 @@ func (fc *FtpConn) handleSTOR() error {
 		return err
 	}
 	fc.Send(226, "Transfer complete.")
+	fc.notifier.FileCreate(fc.user, path)
 	return nil
 }
 
@@ -890,6 +901,7 @@ func (fc *FtpConn) handleDELE() error {
 		return err
 	}
 	fc.Send(250, "Delete operation successful.")
+	fc.notifier.FileDelete(fc.user, path)
 	return nil
 }
 
@@ -922,6 +934,7 @@ func (fc *FtpConn) handleRNTO() error {
 		return err
 	}
 	fc.Send(250, "Rename successful.")
+	fc.notifier.Rename(fc.user, fc.rename, path)
 	return nil
 }
 
@@ -1058,6 +1071,7 @@ func (fc *FtpConn) handleMKD() error {
 		return err
 	}
 	fc.Send(257, fmt.Sprintf(`"%s" created`, fc.quote(path)))
+	fc.notifier.DirCreate(fc.user, path)
 	return nil
 }
 
@@ -1070,6 +1084,7 @@ func (fc *FtpConn) handleRMD() error {
 		return err
 	}
 	fc.Send(250, "Remove directory operation successful.")
+	fc.notifier.DirDelete(fc.user, path)
 	return nil
 }
 
@@ -1148,7 +1163,7 @@ func (fc *FtpConn) handlePORT() error {
 }
 
 // NewFtpConn return a new ftp session
-func NewFtpConn(conn net.Conn, config *FtpdConfig, tlsConfig *tls.Config, factory DriverFactory) *FtpConn {
+func NewFtpConn(conn net.Conn, config *FtpdConfig, tlsConfig *tls.Config, factory DriverFactory, notifier Notifier) *FtpConn {
 	fc := new(FtpConn)
 
 	fc.ctrlConn = conn
@@ -1157,6 +1172,7 @@ func NewFtpConn(conn net.Conn, config *FtpdConfig, tlsConfig *tls.Config, factor
 	fc.reader = bufio.NewReader(conn)
 	fc.writer = bufio.NewWriter(conn)
 	fc.factory = factory
+	fc.notifier = notifier
 	fc.path = "/"
 	fc.arg = ""
 	fc.mode = "ASCII"
@@ -1459,7 +1475,8 @@ func NewFtpdConfig(configFile string) (*FtpdConfig, error) {
 	return &cfg, nil
 }
 
-func FtpdServe(config *FtpdConfig) error {
+// FtpdServe start the ftp server
+func FtpdServe(config *FtpdConfig, notifier Notifier) error {
 	var tlsConfig *tls.Config
 	if config.AuthTLS.Enable {
 		cert, err := tls.LoadX509KeyPair(config.AuthTLS.CertFile, config.AuthTLS.KeyFile)
@@ -1493,6 +1510,6 @@ func FtpdServe(config *FtpdConfig) error {
 		if err != nil {
 			continue
 		}
-		go NewFtpConn(conn, config, tlsConfig, factory).Serve()
+		go NewFtpConn(conn, config, tlsConfig, factory, notifier).Serve()
 	}
 }
