@@ -1226,12 +1226,6 @@ func (fc *FtpConn) quote(s string) string {
 func (fc *FtpConn) pasvListen() (*net.TCPListener, error) {
 	nAttempts := fc.config.Pasv.PortEnd - fc.config.Pasv.PortStart
 
-	if nAttempts < 10 {
-		nAttempts = 10
-	} else if nAttempts > 1000 {
-		nAttempts = 1000
-	}
-
 	for i := 0; i < nAttempts; i++ {
 		port := fc.config.Pasv.PortStart + rand.Intn(nAttempts+1)
 		laddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf(":%d", port))
