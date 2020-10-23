@@ -1361,7 +1361,7 @@ func (fc *FtpConn) Serve() {
 }
 
 // NewFtpdConfig return a ftd config
-func NewFtpdConfig(configFile string) (*FtpdConfig, error) {
+func NewFtpdConfig() *FtpdConfig {
 	var cfg FtpdConfig
 
 	cfg.Bind = ":21"
@@ -1389,13 +1389,20 @@ func NewFtpdConfig(configFile string) (*FtpdConfig, error) {
 		"kftpd": "kftpd",
 	}
 
+	return &cfg
+}
+
+// LoadFtpdConfig return a ftd config loaded from config file
+func LoadFtpdConfig(configFile string) (*FtpdConfig, error) {
+	cfg := NewFtpdConfig()
+
 	data, err := ioutil.ReadFile(configFile)
 	if err != nil {
 		log.Println(err)
 		log.Println("configuration [default] used")
 	} else {
 		log.Printf("configuration [%s] used\n", configFile)
-		if err := yaml.Unmarshal(data, &cfg); err != nil {
+		if err := yaml.Unmarshal(data, cfg); err != nil {
 			log.Println(err)
 			return nil, err
 		}
@@ -1476,7 +1483,7 @@ func NewFtpdConfig(configFile string) (*FtpdConfig, error) {
 		}
 	}
 
-	return &cfg, nil
+	return cfg, nil
 }
 
 // FtpdServe start the ftp server

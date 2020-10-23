@@ -34,7 +34,7 @@ func main() {
 	flag.StringVar(&configFile, "c", "kftpd.yaml", "config file")
 	flag.Parse()
 
-	config, err := kftpd.NewFtpdConfig(configFile)
+	config, err := kftpd.LoadFtpdConfig(configFile)
 	if err != nil {
 		log.Println(err)
 		flag.Usage()
