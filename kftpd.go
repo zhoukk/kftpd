@@ -1224,7 +1224,7 @@ func (fc *FtpConn) quote(s string) string {
 }
 
 func (fc *FtpConn) pasvListen() (*net.TCPListener, error) {
-	nAttempts := fc.config.Pasv.PortEnd - fc.config.Pasv.PortStart
+	nAttempts := fc.config.Pasv.PortEnd - fc.config.Pasv.PortStart + 1
 
 	for i := 0; i < nAttempts; i++ {
 		port := fc.config.Pasv.PortStart + rand.Intn(nAttempts+1)
