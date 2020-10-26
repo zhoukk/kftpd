@@ -1389,25 +1389,6 @@ func NewFtpdConfig() *FtpdConfig {
 		"kftpd": "kftpd",
 	}
 
-	return &cfg
-}
-
-// LoadFtpdConfig return a ftd config loaded from config file
-func LoadFtpdConfig(configFile string) (*FtpdConfig, error) {
-	cfg := NewFtpdConfig()
-
-	data, err := ioutil.ReadFile(configFile)
-	if err != nil {
-		log.Println(err)
-		log.Println("configuration [default] used")
-	} else {
-		log.Printf("configuration [%s] used\n", configFile)
-		if err := yaml.Unmarshal(data, cfg); err != nil {
-			log.Println(err)
-			return nil, err
-		}
-	}
-
 	if env, ok := os.LookupEnv("KFTPD_BIND"); ok {
 		cfg.Bind = env
 	}
@@ -1480,6 +1461,25 @@ func LoadFtpdConfig(configFile string) (*FtpdConfig, error) {
 			if len(s) == 2 {
 				cfg.Users[s[0]] = s[1]
 			}
+		}
+	}
+
+	return &cfg
+}
+
+// LoadFtpdConfig return a ftd config loaded from config file
+func LoadFtpdConfig(configFile string) (*FtpdConfig, error) {
+	cfg := NewFtpdConfig()
+
+	data, err := ioutil.ReadFile(configFile)
+	if err != nil {
+		log.Println(err)
+		log.Println("configuration [default] used")
+	} else {
+		log.Printf("configuration [%s] used\n", configFile)
+		if err := yaml.Unmarshal(data, cfg); err != nil {
+			log.Println(err)
+			return nil, err
 		}
 	}
 
