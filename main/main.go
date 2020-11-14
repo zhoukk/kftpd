@@ -7,28 +7,6 @@ import (
 	"github.com/zhoukk/kftpd"
 )
 
-type logNotifier struct{}
-
-func (*logNotifier) FileCreate(user, name string) {
-	log.Printf("user: %s create file: %s\n", user, name)
-}
-
-func (*logNotifier) FileDelete(user, name string) {
-	log.Printf("user: %s delete file: %s\n", user, name)
-}
-
-func (*logNotifier) DirCreate(user, name string) {
-	log.Printf("user: %s create dir: %s\n", user, name)
-}
-
-func (*logNotifier) DirDelete(user, name string) {
-	log.Printf("user: %s delete dir: %s\n", user, name)
-}
-
-func (*logNotifier) Rename(user, from, to string) {
-	log.Printf("user: %s rename: %s to %s\n", user, from, to)
-}
-
 func main() {
 	var configFile string
 	flag.StringVar(&configFile, "c", "kftpd.yaml", "config file")
@@ -45,5 +23,50 @@ func main() {
 		log.Printf("%+v\n", config)
 	}
 
-	log.Fatal(kftpd.FtpdServe(config, &logNotifier{}))
+	kftpd.UserBeforeLogin(func(user, pass string) bool {
+		log.Printf("UserBeforeLogin %s %s\n", user, pass)
+		return true
+	})
+
+	kftpd.UserAfterLogin(func(user string) {
+		log.Printf("UserAfterLogin %s\n", user)
+	})
+
+	kftpd.FileBeforePut(func(user, path string) bool {
+		log.Printf("FileBeforePut %s %s\n", user, path)
+		return true
+	})
+
+	kftpd.FileAfterPut(func(user, path string) {
+		log.Printf("FileAfterPut %s %s\n", user, path)
+	})
+
+	kftpd.FileBeforeGet(func(user, path string) bool {
+		log.Printf("FileBeforeGet %s %s\n", user, path)
+		return true
+	})
+
+	kftpd.FileAfterGet(func(user, path string) {
+		log.Printf("FileAfterGet %s %s\n", user, path)
+	})
+
+	kftpd.FileBeforeDelete(func(user, path string) bool {
+		log.Printf("FileBeforeDelete %s %s\n", user, path)
+		return true
+	})
+
+	kftpd.FileAfterDelete(func(user, path string) {
+		log.Printf("FileAfterDelete %s %s\n", user, path)
+	})
+
+	kftpd.FileBeforeRename(func(user, from, to string) bool {
+		log.Printf("FileBeforeRename %s %s %s\n", user, from, to)
+		return true
+	})
+
+	kftpd.FileAfterRename(func(user, from, to string) {
+		log.Printf("FileAfterRename %s %s %s\n", user, from, to)
+	})
+
+	log.Fatal(kftpd.FtpdServe(config))
 }

@@ -89,15 +89,6 @@ type Driver interface {
 	PutFile(string, int64, io.Reader) (int64, error)
 }
 
-// Notifier - notify file or dir create and delete
-type Notifier interface {
-	FileCreate(string, string)
-	FileDelete(string, string)
-	DirCreate(string, string)
-	DirDelete(string, string)
-	Rename(string, string, string)
-}
-
 // MinioDriverFactory - minio driver factory
 type MinioDriverFactory struct {
 	endpoint        string
@@ -558,6 +549,27 @@ func (driver *FileDriver) ListDir(path string, callback func(FileInfo) error) er
 	})
 }
 
+// FtpdHandler - ftpd handler
+type FtpdHandler struct {
+	UserBeforeLogin func(string, string) bool
+	UserAfterLogin  func(string)
+
+	FileBeforePut func(string, string) bool
+	FileAfterPut  func(string, string)
+
+	FileBeforeGet func(string, string) bool
+	FileAfterGet  func(string, string)
+
+	FileBeforeDelete func(string, string) bool
+	FileAfterDelete  func(string, string)
+
+	FileBeforeRename func(string, string, string) bool
+	FileAfterRename  func(string, string, string)
+}
+
+// Handler - ftpd global handler
+var Handler FtpdHandler
+
 // FtpConn - ftp session
 type FtpConn struct {
 	arg       string
@@ -573,7 +585,6 @@ type FtpConn struct {
 	tlsConfig *tls.Config
 	factory   DriverFactory
 	driver    Driver
-	notifier  Notifier
 	ctrlConn  net.Conn
 	dataConn  net.Conn
 	reader    *bufio.Reader
@@ -646,8 +657,16 @@ func (fc *FtpConn) handleUSER() error {
 }
 
 func (fc *FtpConn) handlePASS() error {
-	pwd, ok := fc.config.Users[fc.user]
-	if ok && pwd == fc.arg {
+	loginOk := false
+	if Handler.UserBeforeLogin != nil {
+		loginOk = Handler.UserBeforeLogin(fc.user, fc.arg)
+	} else {
+		pwd, ok := fc.config.Users[fc.user]
+		if ok && pwd == fc.arg {
+			loginOk = true
+		}
+	}
+	if loginOk {
 		driver, err := fc.factory.NewDriver(fc.user)
 		if err != nil {
 			fc.Close()
@@ -656,6 +675,9 @@ func (fc *FtpConn) handlePASS() error {
 		fc.driver = driver
 		fc.authd = true
 		fc.Send(230, "Login successful.")
+		if Handler.UserAfterLogin != nil {
+			Handler.UserAfterLogin(fc.user)
+		}
 		return nil
 	}
 	fc.Send(530, "Login incorrect.")
@@ -835,6 +857,14 @@ func (fc *FtpConn) handleRETR() error {
 		fc.offset = 0
 		fc.CloseFileTransfer()
 	}()
+
+	if Handler.FileBeforeGet != nil {
+		if !Handler.FileBeforeGet(fc.user, path) {
+			fc.Send(550, "Not Allowed.")
+			return nil
+		}
+	}
+
 	size, reader, err := fc.driver.GetFile(path, fc.offset)
 	if err != nil {
 		fc.Send(550, "Failed to open file.")
@@ -848,6 +878,9 @@ func (fc *FtpConn) handleRETR() error {
 		return err
 	}
 	fc.Send(226, "Transfer complete.")
+	if Handler.FileAfterGet != nil {
+		Handler.FileAfterGet(fc.user, path)
+	}
 	return nil
 }
 
@@ -858,6 +891,14 @@ func (fc *FtpConn) handleSTOR() error {
 		fc.offset = 0
 		fc.CloseFileTransfer()
 	}()
+
+	if Handler.FileBeforePut != nil {
+		if !Handler.FileBeforePut(fc.user, path) {
+			fc.Send(550, "Not Allowed.")
+			return nil
+		}
+	}
+
 	reader := fc.GetFileTransfer()
 	if reader == nil {
 		fc.Send(550, "Failed to open transfer.")
@@ -870,8 +911,8 @@ func (fc *FtpConn) handleSTOR() error {
 		return err
 	}
 	fc.Send(226, "Transfer complete.")
-	if fc.notifier != nil {
-		fc.notifier.FileCreate(fc.user, path)
+	if Handler.FileAfterPut != nil {
+		Handler.FileAfterPut(fc.user, path)
 	}
 	return nil
 }
@@ -897,14 +938,21 @@ func (fc *FtpConn) handleAPPE() error {
 func (fc *FtpConn) handleDELE() error {
 	path := fc.buildPath(fc.arg)
 
+	if Handler.FileBeforeDelete != nil {
+		if !Handler.FileBeforeDelete(fc.user, path) {
+			fc.Send(550, "Not Allowed.")
+			return nil
+		}
+	}
+
 	err := fc.driver.DeleteFile(path)
 	if err != nil {
 		fc.Send(550, "Delete operation failed.")
 		return err
 	}
 	fc.Send(250, "Delete operation successful.")
-	if fc.notifier != nil {
-		fc.notifier.FileDelete(fc.user, path)
+	if Handler.FileAfterDelete != nil {
+		Handler.FileAfterDelete(fc.user, path)
 	}
 	return nil
 }
@@ -929,6 +977,13 @@ func (fc *FtpConn) handleRNTO() error {
 	}
 	path := fc.buildPath(fc.arg)
 
+	if Handler.FileBeforeRename != nil {
+		if !Handler.FileBeforeRename(fc.user, fc.rename, path) {
+			fc.Send(550, "Not Allowed.")
+			return nil
+		}
+	}
+
 	err := fc.driver.Rename(fc.rename, path)
 	defer func() {
 		fc.rename = ""
@@ -938,8 +993,8 @@ func (fc *FtpConn) handleRNTO() error {
 		return err
 	}
 	fc.Send(250, "Rename successful.")
-	if fc.notifier != nil {
-		fc.notifier.Rename(fc.user, fc.rename, path)
+	if Handler.FileAfterRename != nil {
+		Handler.FileAfterRename(fc.user, fc.rename, path)
 	}
 	return nil
 }
@@ -1077,9 +1132,6 @@ func (fc *FtpConn) handleMKD() error {
 		return err
 	}
 	fc.Send(257, fmt.Sprintf(`"%s" created`, fc.quote(path)))
-	if fc.notifier != nil {
-		fc.notifier.DirCreate(fc.user, path)
-	}
 	return nil
 }
 
@@ -1092,9 +1144,6 @@ func (fc *FtpConn) handleRMD() error {
 		return err
 	}
 	fc.Send(250, "Remove directory operation successful.")
-	if fc.notifier != nil {
-		fc.notifier.DirDelete(fc.user, path)
-	}
 	return nil
 }
 
@@ -1173,7 +1222,7 @@ func (fc *FtpConn) handlePORT() error {
 }
 
 // NewFtpConn return a new ftp session
-func NewFtpConn(conn net.Conn, config *FtpdConfig, tlsConfig *tls.Config, factory DriverFactory, notifier Notifier) *FtpConn {
+func NewFtpConn(conn net.Conn, config *FtpdConfig, tlsConfig *tls.Config, factory DriverFactory) *FtpConn {
 	fc := new(FtpConn)
 
 	fc.ctrlConn = conn
@@ -1182,7 +1231,6 @@ func NewFtpConn(conn net.Conn, config *FtpdConfig, tlsConfig *tls.Config, factor
 	fc.reader = bufio.NewReader(conn)
 	fc.writer = bufio.NewWriter(conn)
 	fc.factory = factory
-	fc.notifier = notifier
 	fc.path = "/"
 	fc.arg = ""
 	fc.mode = "ASCII"
@@ -1360,6 +1408,56 @@ func (fc *FtpConn) Serve() {
 	fc.Close()
 }
 
+// UserBeforeLogin register
+func UserBeforeLogin(handler func(string, string) bool) {
+	Handler.UserBeforeLogin = handler
+}
+
+// UserAfterLogin register
+func UserAfterLogin(handler func(string)) {
+	Handler.UserAfterLogin = handler
+}
+
+// FileBeforePut register
+func FileBeforePut(handler func(string, string) bool) {
+	Handler.FileBeforePut = handler
+}
+
+// FileAfterPut register
+func FileAfterPut(handler func(string, string)) {
+	Handler.FileAfterPut = handler
+}
+
+// FileBeforeGet register
+func FileBeforeGet(handler func(string, string) bool) {
+	Handler.FileBeforeGet = handler
+}
+
+// FileAfterGet register
+func FileAfterGet(handler func(string, string)) {
+	Handler.FileAfterGet = handler
+}
+
+// FileBeforeDelete register
+func FileBeforeDelete(handler func(string, string) bool) {
+	Handler.FileBeforeDelete = handler
+}
+
+// FileAfterDelete register
+func FileAfterDelete(handler func(string, string)) {
+	Handler.FileAfterDelete = handler
+}
+
+// FileBeforeRename register
+func FileBeforeRename(handler func(string, string, string) bool) {
+	Handler.FileBeforeRename = handler
+}
+
+// FileAfterRename register
+func FileAfterRename(handler func(string, string, string)) {
+	Handler.FileAfterRename = handler
+}
+
 // NewFtpdConfig return a ftd config
 func NewFtpdConfig() *FtpdConfig {
 	var cfg FtpdConfig
@@ -1487,7 +1585,7 @@ func LoadFtpdConfig(configFile string) (*FtpdConfig, error) {
 }
 
 // FtpdServe start the ftp server
-func FtpdServe(config *FtpdConfig, notifier Notifier) error {
+func FtpdServe(config *FtpdConfig) error {
 	var tlsConfig *tls.Config
 	if config.AuthTLS.Enable {
 		cert, err := tls.LoadX509KeyPair(config.AuthTLS.CertFile, config.AuthTLS.KeyFile)
@@ -1521,6 +1619,6 @@ func FtpdServe(config *FtpdConfig, notifier Notifier) error {
 		if err != nil {
 			continue
 		}
-		go NewFtpConn(conn, config, tlsConfig, factory, notifier).Serve()
+		go NewFtpConn(conn, config, tlsConfig, factory).Serve()
 	}
 }
