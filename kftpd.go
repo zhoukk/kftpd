@@ -640,7 +640,9 @@ var cmdMap = map[string]FtpCmd{
 	"MLSD": {(*FtpConn).handleMLSD, true},
 	"MLST": {(*FtpConn).handleMLST, true},
 	"MKD":  {(*FtpConn).handleMKD, true},
+	"XMKD": {(*FtpConn).handleMKD, true},
 	"RMD":  {(*FtpConn).handleRMD, true},
+	"XRMD": {(*FtpConn).handleRMD, true},
 
 	// Connection handling
 	"TYPE": {(*FtpConn).handleTYPE, true},
