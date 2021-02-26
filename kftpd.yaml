@@ -7,7 +7,7 @@
 # ENV KFTPD_BIND
 Bind: :21
 
-# KFtpd storage driver, support file and minio
+# KFtpd storage driver, support file, minio and custom from SetDriverFactory
 # 
 # ENV KFTPD_DRIVER
 Driver: file
