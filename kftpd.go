@@ -1578,14 +1578,12 @@ func NewFtpdConfig() *FtpdConfig {
 func LoadFtpdConfig(configFile string) (*FtpdConfig, error) {
 	cfg := NewFtpdConfig()
 
-	data, err := ioutil.ReadFile(configFile)
-	if err != nil {
-		log.Println(err)
-		log.Println("configuration [default] used")
-	} else {
-		log.Printf("configuration [%s] used\n", configFile)
+	if len(configFile) > 0 {
+		data, err := ioutil.ReadFile(configFile)
+		if err != nil {
+			return nil, err
+		}
 		if err := yaml.Unmarshal(data, cfg); err != nil {
-			log.Println(err)
 			return nil, err
 		}
 	}
