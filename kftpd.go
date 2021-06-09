@@ -1178,9 +1178,9 @@ func (fc *FtpConn) handlePASV() error {
 		conn, err := listener.Accept()
 		if err != nil {
 			log.Printf("pasv accept fail, err: %v\n", err)
-			return
+		} else {
+			fc.OpenFileTransfer(conn)
 		}
-		fc.OpenFileTransfer(conn)
 		listener.Close()
 	}()
 
