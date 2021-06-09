@@ -95,7 +95,6 @@ type MinioDriverFactory struct {
 	accessKeyID     string
 	secretAccessKey string
 	useSSL          bool
-	location        string
 	bucket          string
 }
 
@@ -220,7 +219,7 @@ func (driver *MinioDriver) Stat(path string) (FileInfo, error) {
 
 // Chtimes change file modify time
 func (driver *MinioDriver) Chtimes(path string, atime time.Time, mtime time.Time) error {
-	return errors.New("Not Implemented")
+	return errors.New("not implemented")
 }
 
 // DeleteDir delete dir in minio
@@ -445,7 +444,7 @@ func (driver *FileDriver) DeleteDir(path string) error {
 	if fi.IsDir() {
 		return os.RemoveAll(rpath)
 	}
-	return errors.New("Not a directory")
+	return errors.New("not a directory")
 }
 
 // DeleteFile delete a file
@@ -458,7 +457,7 @@ func (driver *FileDriver) DeleteFile(path string) error {
 	if !fi.IsDir() {
 		return os.Remove(rpath)
 	}
-	return errors.New("Not a file")
+	return errors.New("not a file")
 }
 
 // Rename rename a file or dir
@@ -504,7 +503,7 @@ func (driver *FileDriver) PutFile(path string, offset int64, reader io.Reader) (
 
 	fi, err := os.Lstat(rpath)
 	if err == nil && fi.IsDir() {
-		return 0, errors.New("Directory already exist")
+		return 0, errors.New("directory already exist")
 	}
 
 	ff := os.O_WRONLY
@@ -518,6 +517,7 @@ func (driver *FileDriver) PutFile(path string, offset int64, reader io.Reader) (
 	if err != nil {
 		return 0, err
 	}
+	defer f.Close()
 	if offset > 0 {
 		_, err = f.Seek(offset, io.SeekStart)
 		if err != nil {
@@ -691,7 +691,7 @@ func (fc *FtpConn) handleAUTH() error {
 		fc.Send(550, "Auth not enable.")
 		return nil
 	}
-	if fc.tls == false && (fc.arg == "TLS" || fc.arg == "SSL") {
+	if !fc.tls && (fc.arg == "TLS" || fc.arg == "SSL") {
 		conn := tls.Server(fc.ctrlConn, fc.tlsConfig)
 		err := conn.Handshake()
 		if err != nil {
@@ -1154,11 +1154,9 @@ func (fc *FtpConn) handleTYPE() error {
 	case "A", "a":
 		fc.mode = "ASCII"
 		fc.Send(200, "Switching to ASCII mode.")
-		break
 	case "I", "i":
 		fc.mode = "BINARY"
 		fc.Send(200, "Switching to Binary mode.")
-		break
 	default:
 		fc.mode = ""
 		fc.Send(500, "Unrecognised TYPE command.")
@@ -1288,7 +1286,7 @@ func (fc *FtpConn) pasvListen() (*net.TCPListener, error) {
 			return listener, err
 		}
 	}
-	return nil, errors.New("No Available Listening Port")
+	return nil, errors.New("no available listening port")
 }
 
 // Close close ftp connections
@@ -1390,7 +1388,7 @@ func (fc *FtpConn) Serve() {
 			for cmd := range cmdMap {
 				cmds = append(cmds, " "+cmd)
 			}
-			sort.Sort(sort.StringSlice(cmds))
+			sort.Strings(cmds)
 			fc.SendMulti(214, "The following commands are recognized.", strings.Join(cmds, "\r\n"), "Help OK.")
 			continue
 		}
@@ -1607,12 +1605,9 @@ func FtpdServe(config *FtpdConfig) error {
 	switch config.Driver {
 	case "file":
 		factory = NewFileDriverFactory(config.FileDriver.RootPath)
-		break
 	case "minio":
 		factory = NewMinioDriverFactory(config.MinioDriver.Endpoint, config.MinioDriver.AccessKeyID, config.MinioDriver.SecretAccessKey, config.MinioDriver.Bucket, config.MinioDriver.UseSSL)
-		break
 	case "custom":
-		break
 	default:
 		return fmt.Errorf("not supported driver: %s", config.Driver)
 	}
