@@ -31,11 +31,17 @@ type FtpdConfig struct {
 	Debug  bool   `yaml:"Debug,omitempty"`
 
 	Pasv struct {
+		Enable        bool   `yaml:"Enable,omitempty"`
 		IP            string `yaml:"IP,omitempty"`
 		PortStart     int    `yaml:"PortStart,omitempty"`
 		PortEnd       int    `yaml:"PortEnd,omitempty"`
 		ListenTimeout int    `yaml:"ListenTimeout,omitempty"`
 	} `yaml:"Pasv,omitempty"`
+
+	Port struct {
+		Enable         bool `yaml:"Enable,omitempty"`
+		ConnectTimeout int  `yaml:"ConnectTimeout,omitempty"`
+	} `yaml:"Port,omitempty"`
 
 	FileDriver struct {
 		RootPath string `yaml:"RootPath,omitempty"`
@@ -1165,6 +1171,10 @@ func (fc *FtpConn) handleTYPE() error {
 }
 
 func (fc *FtpConn) handlePASV() error {
+	if !fc.config.Pasv.Enable {
+		fc.Send(421, "PASV command is disabled.")
+		return nil
+	}
 	listener, err := fc.pasvListen()
 	if err != nil {
 		log.Printf("pasv listen fail, err: %v\n", err)
@@ -1195,6 +1205,10 @@ func (fc *FtpConn) handlePASV() error {
 }
 
 func (fc *FtpConn) handlePORT() error {
+	if !fc.config.Port.Enable {
+		fc.Send(421, "PORT command is disabled.")
+		return nil
+	}
 	quads := strings.Split(fc.arg, ",")
 	if len(quads) < 6 {
 		fc.Send(500, "Illegal PORT command.")
@@ -1205,13 +1219,7 @@ func (fc *FtpConn) handlePORT() error {
 	port := (p1 * 256) + p2
 	ip := quads[0] + "." + quads[1] + "." + quads[2] + "." + quads[3]
 
-	addr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort(ip, strconv.Itoa(port)))
-	if err != nil {
-		fc.Send(500, "Illegal PORT command.")
-		return err
-	}
-
-	conn, err := net.DialTCP("tcp", nil, addr)
+	conn, err := net.DialTimeout("tcp", net.JoinHostPort(ip, strconv.Itoa(port)), time.Duration(fc.config.Port.ConnectTimeout)*time.Second)
 	if err != nil {
 		fc.Send(500, "Illegal PORT command.")
 		return err
@@ -1473,10 +1481,14 @@ func NewFtpdConfig() *FtpdConfig {
 	cfg.Driver = "file"
 	cfg.Debug = true
 
+	cfg.Pasv.Enable = true
 	cfg.Pasv.IP = ""
 	cfg.Pasv.PortStart = 21000
 	cfg.Pasv.PortEnd = 21100
 	cfg.Pasv.ListenTimeout = 10
+
+	cfg.Port.Enable = true
+	cfg.Port.ConnectTimeout = 10
 
 	cfg.FileDriver.RootPath = "kftpd-data"
 
@@ -1506,6 +1518,10 @@ func NewFtpdConfig() *FtpdConfig {
 		cfg.Debug, _ = strconv.ParseBool(env)
 	}
 
+	if env, ok := os.LookupEnv("KFTPD_PASV_ENABLE"); ok {
+		cfg.Pasv.Enable, _ = strconv.ParseBool(env)
+	}
+
 	if env, ok := os.LookupEnv("KFTPD_PASV_IP"); ok {
 		cfg.Pasv.IP = env
 	}
@@ -1518,8 +1534,16 @@ func NewFtpdConfig() *FtpdConfig {
 		cfg.Pasv.PortEnd, _ = strconv.Atoi(env)
 	}
 
-	if env, ok := os.LookupEnv("KFTPD_PASV_LISTENTIMEOUT"); ok {
+	if env, ok := os.LookupEnv("KFTPD_PASV_LISTEN_TIMEOUT"); ok {
 		cfg.Pasv.ListenTimeout, _ = strconv.Atoi(env)
+	}
+
+	if env, ok := os.LookupEnv("KFTPD_PORT_ENABLE"); ok {
+		cfg.Port.Enable, _ = strconv.ParseBool(env)
+	}
+
+	if env, ok := os.LookupEnv("KFTPD_PORT_CONNECT_TIMEOUT"); ok {
+		cfg.Port.ConnectTimeout, _ = strconv.Atoi(env)
 	}
 
 	if env, ok := os.LookupEnv("KFTPD_FILEDRIVER_ROOTPATH"); ok {
