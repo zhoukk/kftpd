@@ -1180,9 +1180,7 @@ func (fc *FtpConn) handlePASV() error {
 		log.Printf("pasv listen fail, err: %v\n", err)
 		return err
 	}
-	fc.lock.Lock()
 	go func() {
-		defer fc.lock.Unlock()
 		conn, err := listener.Accept()
 		if err != nil {
 			log.Printf("pasv accept fail, err: %v\n", err)
