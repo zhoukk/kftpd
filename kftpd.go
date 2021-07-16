@@ -1382,7 +1382,7 @@ func (fc *FtpConn) Serve() {
 			continue
 		}
 		if fc.config.Debug {
-			log.Printf("recv: %v\n", string(line))
+			log.Printf("Recv: %v\n", string(line))
 		}
 		words := strings.SplitN(string(line), " ", 2)
 		command := strings.ToUpper(words[0])
