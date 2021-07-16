@@ -1303,14 +1303,12 @@ func (fc *FtpConn) Close() {
 		fc.ctrlConn.Close()
 		fc.ctrlConn = nil
 	}
-	if fc.dataConn != nil {
-		fc.dataConn.Close()
-		fc.dataConn = nil
-	}
 }
 
 // OpenFileTransfer open a ftp file transfer
 func (fc *FtpConn) OpenFileTransfer(conn net.Conn) {
+	fc.lock.Lock()
+	defer fc.lock.Unlock()
 	if fc.dataConn != nil {
 		fc.dataConn.Close()
 	}
@@ -1319,6 +1317,8 @@ func (fc *FtpConn) OpenFileTransfer(conn net.Conn) {
 
 // CloseFileTransfer close a ftp file transfer
 func (fc *FtpConn) CloseFileTransfer() {
+	fc.lock.Lock()
+	defer fc.lock.Unlock()
 	if fc.dataConn != nil {
 		fc.dataConn.Close()
 		fc.dataConn = nil
