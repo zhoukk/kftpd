@@ -21,6 +21,11 @@ Debug: true
 # KFtpd Pasv ip and port range Configuration.
 #
 Pasv:
+  # KFtpd pasv enable
+  #
+  # ENV KFTPD_PASV_ENABLE
+  Enable: true
+
   # KFtpd pasv ip for client
   #
   # ENV KFTPD_PASV_IP
@@ -40,6 +45,20 @@ Pasv:
   #
   # ENV KFTPD_PASV_LISTENTIMEOUT
   ListenTimeout: 10
+
+#
+# KFtpd Port Configuration.
+#
+Port:
+  # KFtpd port enable
+  #
+  # ENV KFTPD_PORT_ENABLE
+  Enable: true
+
+  # KFtpd port connect timeout
+  #
+  # ENV KFTPD_PORT_CONNECT_TIMEOUT
+  ConnectTimeout: 10
 
 #
 # KFtpd File Driver Configuration.
