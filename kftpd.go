@@ -596,6 +596,7 @@ type FtpConn struct {
 	reader    *bufio.Reader
 	writer    *bufio.Writer
 	lock      sync.Mutex
+	notify    chan int
 }
 
 // FtpCmd - ftp command handler
@@ -879,6 +880,8 @@ func (fc *FtpConn) handleRETR() error {
 		return err
 	}
 	defer reader.Close()
+
+	<-fc.notify
 	fc.Send(150, fmt.Sprintf("Opening %s mode data connection for %s (%d bytes).", fc.mode, fc.arg, size))
 	err = fc.PutFileTransfer(reader)
 	if err != nil {
@@ -907,6 +910,7 @@ func (fc *FtpConn) handleSTOR() error {
 		}
 	}
 
+	<-fc.notify
 	reader := fc.GetFileTransfer()
 	if reader == nil {
 		fc.Send(550, "Failed to open transfer.")
@@ -932,8 +936,14 @@ func (fc *FtpConn) handleAPPE() error {
 		fc.offset = 0
 		fc.CloseFileTransfer()
 	}()
-	fc.Send(150, "Ok to send data.")
+
+	<-fc.notify
 	reader := fc.GetFileTransfer()
+	if reader == nil {
+		fc.Send(550, "Failed to open transfer.")
+		return nil
+	}
+	fc.Send(150, "Ok to send data.")
 	_, err := fc.driver.PutFile(path, fc.offset, reader)
 	if err != nil {
 		fc.Send(426, "Failure reading network stream.")
@@ -1071,7 +1081,7 @@ func (fc *FtpConn) handleNLST() error {
 		fc.Send(226, "Transfer done (but failed to open directory).")
 		return err
 	}
-
+	<-fc.notify
 	fc.WriteFileTransfer([]byte(strings.Join(files, "\r\n")))
 	fc.Send(226, "Directory send OK.")
 	return nil
@@ -1093,6 +1103,7 @@ func (fc *FtpConn) handleLIST() error {
 		return err
 	}
 
+	<-fc.notify
 	fc.WriteFileTransfer([]byte(strings.Join(files, "\r\n")))
 	fc.Send(226, "Directory send OK.")
 	return nil
@@ -1114,6 +1125,7 @@ func (fc *FtpConn) handleMLSD() error {
 		return err
 	}
 
+	<-fc.notify
 	fc.WriteFileTransfer([]byte(strings.Join(files, "\r\n")))
 	fc.Send(226, "Directory send OK.")
 	return nil
@@ -1184,8 +1196,10 @@ func (fc *FtpConn) handlePASV() error {
 		conn, err := listener.Accept()
 		if err != nil {
 			log.Printf("pasv accept fail, err: %v\n", err)
+			fc.notify <- 0
 		} else {
 			fc.OpenFileTransfer(conn)
+			fc.notify <- 1
 		}
 		listener.Close()
 	}()
@@ -1223,6 +1237,7 @@ func (fc *FtpConn) handlePORT() error {
 		return err
 	}
 	fc.OpenFileTransfer(conn)
+	fc.notify <- 1
 	fc.Send(200, "PORT command successful.")
 	return nil
 }
@@ -1241,6 +1256,7 @@ func NewFtpConn(conn net.Conn, config *FtpdConfig, tlsConfig *tls.Config, factor
 	fc.arg = ""
 	fc.mode = "ASCII"
 	fc.authd = false
+	fc.notify = make(chan int, 1)
 
 	return fc
 }
@@ -1301,6 +1317,7 @@ func (fc *FtpConn) Close() {
 		fc.ctrlConn.Close()
 		fc.ctrlConn = nil
 	}
+	close(fc.notify)
 }
 
 // OpenFileTransfer open a ftp file transfer
