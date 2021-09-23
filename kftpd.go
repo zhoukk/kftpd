@@ -1310,6 +1310,9 @@ func (fc *FtpConn) OpenFileTransfer(conn net.Conn) {
 	if fc.dataConn != nil {
 		fc.dataConn.Close()
 	}
+	if fc.config.Debug {
+		log.Printf("Open Transfer\n")
+	}
 	fc.dataConn = conn
 }
 
@@ -1320,6 +1323,9 @@ func (fc *FtpConn) CloseFileTransfer() {
 	if fc.dataConn != nil {
 		fc.dataConn.Close()
 		fc.dataConn = nil
+		if fc.config.Debug {
+			log.Printf("Close Transfer\n")
+		}
 	}
 }
 
