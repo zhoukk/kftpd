@@ -1317,7 +1317,6 @@ func (fc *FtpConn) Close() {
 		fc.ctrlConn.Close()
 		fc.ctrlConn = nil
 	}
-	close(fc.notify)
 }
 
 // OpenFileTransfer open a ftp file transfer
