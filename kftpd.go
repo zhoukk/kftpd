@@ -578,6 +578,7 @@ var ftpHandler FtpdHandler
 
 // FtpConn - ftp session
 type FtpConn struct {
+	id        int
 	arg       string
 	user      string
 	path      string
@@ -596,6 +597,7 @@ type FtpConn struct {
 	reader    *bufio.Reader
 	writer    *bufio.Writer
 	lock      sync.Mutex
+	pasvPort  int
 	notify    chan int
 }
 
@@ -870,6 +872,7 @@ func (fc *FtpConn) handleRETR() error {
 	if ftpHandler.FileBeforeGet != nil {
 		if !ftpHandler.FileBeforeGet(fc.user, path) {
 			fc.Send(550, "Not Allowed.")
+			<-fc.notify
 			return nil
 		}
 	}
@@ -877,6 +880,7 @@ func (fc *FtpConn) handleRETR() error {
 	size, reader, err := fc.driver.GetFile(path, fc.offset)
 	if err != nil {
 		fc.Send(550, "Failed to open file.")
+		<-fc.notify
 		return err
 	}
 	defer reader.Close()
@@ -906,6 +910,7 @@ func (fc *FtpConn) handleSTOR() error {
 	if ftpHandler.FileBeforePut != nil {
 		if !ftpHandler.FileBeforePut(fc.user, path) {
 			fc.Send(550, "Not Allowed.")
+			<-fc.notify
 			return nil
 		}
 	}
@@ -1079,8 +1084,10 @@ func (fc *FtpConn) handleNLST() error {
 	})
 	if err != nil {
 		fc.Send(226, "Transfer done (but failed to open directory).")
+		<-fc.notify
 		return err
 	}
+
 	<-fc.notify
 	fc.WriteFileTransfer([]byte(strings.Join(files, "\r\n")))
 	fc.Send(226, "Directory send OK.")
@@ -1100,6 +1107,7 @@ func (fc *FtpConn) handleLIST() error {
 	})
 	if err != nil {
 		fc.Send(226, "Transfer done (but failed to open directory).")
+		<-fc.notify
 		return err
 	}
 
@@ -1122,6 +1130,7 @@ func (fc *FtpConn) handleMLSD() error {
 	})
 	if err != nil {
 		fc.Send(226, "Transfer done (but failed to open directory).")
+		<-fc.notify
 		return err
 	}
 
@@ -1189,18 +1198,17 @@ func (fc *FtpConn) handlePASV() error {
 	}
 	listener, err := fc.pasvListen()
 	if err != nil {
-		log.Printf("pasv listen fail, err: %v\n", err)
+		log.Printf("[%d] pasv listen fail, err: %v\n", fc.id, err)
 		return err
 	}
 	go func() {
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Printf("pasv accept fail, err: %v\n", err)
-			fc.notify <- 0
+			log.Printf("[%d] pasv accept fail, err: %v\n", fc.id, err)
 		} else {
 			fc.OpenFileTransfer(conn)
-			fc.notify <- 1
 		}
+		fc.notify <- 1
 		listener.Close()
 	}()
 
@@ -1243,9 +1251,10 @@ func (fc *FtpConn) handlePORT() error {
 }
 
 // NewFtpConn return a new ftp session
-func NewFtpConn(conn net.Conn, config *FtpdConfig, tlsConfig *tls.Config, factory DriverFactory) *FtpConn {
+func NewFtpConn(cid int, conn net.Conn, config *FtpdConfig, tlsConfig *tls.Config, factory DriverFactory) *FtpConn {
 	fc := new(FtpConn)
 
+	fc.id = cid
 	fc.ctrlConn = conn
 	fc.config = config
 	fc.tlsConfig = tlsConfig
@@ -1304,6 +1313,7 @@ func (fc *FtpConn) pasvListen() (*net.TCPListener, error) {
 		}
 		listener, err := net.ListenTCP("tcp", laddr)
 		if err == nil {
+			fc.pasvPort = port
 			listener.SetDeadline(time.Now().Add(time.Duration(fc.config.Pasv.ListenTimeout) * time.Second))
 			return listener, err
 		}
@@ -1327,7 +1337,7 @@ func (fc *FtpConn) OpenFileTransfer(conn net.Conn) {
 		fc.dataConn.Close()
 	}
 	if fc.config.Debug {
-		log.Printf("Open Transfer\n")
+		log.Printf("[%d] Open: %d\n", fc.id, fc.pasvPort)
 	}
 	fc.dataConn = conn
 }
@@ -1340,8 +1350,9 @@ func (fc *FtpConn) CloseFileTransfer() {
 		fc.dataConn.Close()
 		fc.dataConn = nil
 		if fc.config.Debug {
-			log.Printf("Close Transfer\n")
+			log.Printf("[%d] Close: %d\n", fc.id, fc.pasvPort)
 		}
+		fc.pasvPort = 0
 	}
 }
 
@@ -1366,7 +1377,7 @@ func (fc *FtpConn) WriteFileTransfer(msg []byte) {
 	defer fc.lock.Unlock()
 	if fc.dataConn != nil {
 		if fc.config.Debug {
-			log.Printf("Send: %s\n", string(msg))
+			log.Printf("[%d] Send: %s\n", fc.id, string(msg))
 		}
 		fc.dataConn.Write(msg)
 	}
@@ -1375,7 +1386,7 @@ func (fc *FtpConn) WriteFileTransfer(msg []byte) {
 // Send send code and message to client
 func (fc *FtpConn) Send(code int, msg string) {
 	if fc.config.Debug {
-		log.Printf("Send: %d %s\n", code, msg)
+		log.Printf("[%d] Send: %d %s\n", fc.id, code, msg)
 	}
 	fc.writer.WriteString(fmt.Sprintf("%d %s\r\n", code, msg))
 	fc.writer.Flush()
@@ -1384,7 +1395,7 @@ func (fc *FtpConn) Send(code int, msg string) {
 // SendMulti send code and multiple line message to client
 func (fc *FtpConn) SendMulti(code int, header, body, footer string) {
 	if fc.config.Debug {
-		log.Printf("Send %d %s\n%s\n%s\n", code, header, body, footer)
+		log.Printf("[%d] Send %d %s\n%s\n%s\n", fc.id, code, header, body, footer)
 	}
 	fc.writer.WriteString(fmt.Sprintf("%d-%s\r\n%s\r\n%d %s\r\n", code, header, body, code, footer))
 	fc.writer.Flush()
@@ -1402,7 +1413,7 @@ func (fc *FtpConn) Serve() {
 			continue
 		}
 		if fc.config.Debug {
-			log.Printf("Recv: %v\n", string(line))
+			log.Printf("[%d] Recv: %v\n", fc.id, string(line))
 		}
 		words := strings.SplitN(string(line), " ", 2)
 		command := strings.ToUpper(words[0])
@@ -1430,7 +1441,7 @@ func (fc *FtpConn) Serve() {
 			continue
 		}
 		if err := cmd.Fn(fc); err != nil {
-			log.Printf("[%s] %v\n", command, err)
+			log.Printf("[%d] %s: %v\n", fc.id, command, err)
 		}
 	}
 	fc.Close()
@@ -1661,11 +1672,13 @@ func FtpdServe(config *FtpdConfig) error {
 		return err
 	}
 
+	cid := 0
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
 			continue
 		}
-		go NewFtpConn(conn, config, tlsConfig, factory).Serve()
+		go NewFtpConn(cid, conn, config, tlsConfig, factory).Serve()
+		cid = cid + 1
 	}
 }
