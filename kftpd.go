@@ -1476,6 +1476,16 @@ func UserAfterLogin(handler func(string)) {
 	ftpHandler.UserAfterLogin = handler
 }
 
+// ClientBeforePasv register
+func ClientBeforePasv(handler func(string) bool) {
+	ftpHandler.ClientBeforePasv = handler
+}
+
+// ClientBeforePort register
+func ClientBeforePort(handler func(string) bool) {
+	ftpHandler.ClientBeforePort = handler
+}
+
 // FileBeforePut register
 func FileBeforePut(handler func(string, string) bool) {
 	ftpHandler.FileBeforePut = handler
