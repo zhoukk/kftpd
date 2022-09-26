@@ -560,6 +560,9 @@ type FtpdHandler struct {
 	UserBeforeLogin func(string, string) bool
 	UserAfterLogin  func(string)
 
+	ClientBeforePasv func(string) bool
+	ClientBeforePort func(string) bool
+
 	FileBeforePut func(string, string) bool
 	FileAfterPut  func(string, string)
 
@@ -1196,6 +1199,14 @@ func (fc *FtpConn) handlePASV() error {
 		fc.Send(421, "PASV command is disabled.")
 		return nil
 	}
+
+	if ftpHandler.ClientBeforePasv != nil {
+		if !ftpHandler.ClientBeforePasv(fc.user) {
+			fc.Send(550, "Not Allowed.")
+			return nil
+		}
+	}
+
 	listener, err := fc.pasvListen()
 	if err != nil {
 		log.Printf("[%d] pasv listen fail, err: %v\n", fc.id, err)
@@ -1229,6 +1240,14 @@ func (fc *FtpConn) handlePORT() error {
 		fc.Send(421, "PORT command is disabled.")
 		return nil
 	}
+
+	if ftpHandler.ClientBeforePort != nil {
+		if !ftpHandler.ClientBeforePort(fc.user) {
+			fc.Send(550, "Not Allowed.")
+			return nil
+		}
+	}
+
 	quads := strings.Split(fc.arg, ",")
 	if len(quads) < 6 {
 		fc.Send(500, "Illegal PORT command.")
