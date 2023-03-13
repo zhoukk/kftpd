@@ -26,9 +26,10 @@ import (
 
 // FtpdConfig - ftpd configure
 type FtpdConfig struct {
-	Bind   string `yaml:"Bind,omitempty"`
-	Driver string `yaml:"Driver,omitempty"`
-	Debug  bool   `yaml:"Debug,omitempty"`
+	Bind    string `yaml:"Bind,omitempty"`
+	Driver  string `yaml:"Driver,omitempty"`
+	HomeDir bool   `yaml:"HOMEDIR,omitempty"`
+	Debug   bool   `yaml:"Debug,omitempty"`
 
 	Pasv struct {
 		Enable        bool   `yaml:"Enable,omitempty"`
@@ -44,7 +45,7 @@ type FtpdConfig struct {
 	} `yaml:"Port,omitempty"`
 
 	FileDriver struct {
-		RootPath string `yaml:"RootPath,omitempty"`
+		BaseDir string `yaml:"BaseDir,omitempty"`
 	} `yaml:"FileDriver,omitempty"`
 
 	MinioDriver struct {
@@ -195,6 +196,9 @@ func (driver *MinioDriver) miniodir(path string) string {
 	dir := filepath.Join(driver.user, path)
 	if !strings.HasSuffix(dir, "/") {
 		return dir + "/"
+	}
+	if strings.HasPrefix(dir, "/") {
+		return strings.TrimPrefix(dir, "/")
 	}
 	return dir
 }
@@ -354,9 +358,6 @@ func (driver *MinioDriver) PutFile(path string, offset int64, reader io.Reader) 
 // ListDir return file list from dir in minio
 func (driver *MinioDriver) ListDir(path string, callback func(FileInfo) error) error {
 	rpath := driver.miniodir(path)
-	if rpath == "/" {
-		rpath = ""
-	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -377,6 +378,7 @@ func (driver *MinioDriver) ListDir(path string, callback func(FileInfo) error) e
 			object: object,
 			isDir:  strings.HasSuffix(object.Key, "/"),
 		}
+		log.Println(info)
 		err := callback(info)
 		if err != nil {
 			return err
@@ -681,7 +683,11 @@ func (fc *FtpConn) handlePASS() error {
 		}
 	}
 	if loginOk {
-		driver, err := fc.factory.NewDriver(fc.user)
+		home := ""
+		if fc.config.HomeDir {
+			home = fc.user
+		}
+		driver, err := fc.factory.NewDriver(home)
 		if err != nil {
 			fc.Close()
 			return err
@@ -1539,6 +1545,7 @@ func NewFtpdConfig() *FtpdConfig {
 
 	cfg.Bind = ":21"
 	cfg.Driver = "file"
+	cfg.HomeDir = true
 	cfg.Debug = true
 
 	cfg.Pasv.Enable = true
@@ -1550,7 +1557,7 @@ func NewFtpdConfig() *FtpdConfig {
 	cfg.Port.Enable = true
 	cfg.Port.ConnectTimeout = 10
 
-	cfg.FileDriver.RootPath = "kftpd-data"
+	cfg.FileDriver.BaseDir = "kftpd-data"
 
 	cfg.MinioDriver.Endpoint = "127.0.0.1:9000"
 	cfg.MinioDriver.AccessKeyID = "minioadmin"
@@ -1572,6 +1579,10 @@ func NewFtpdConfig() *FtpdConfig {
 
 	if env, ok := os.LookupEnv("KFTPD_DRIVER"); ok {
 		cfg.Driver = env
+	}
+
+	if env, ok := os.LookupEnv("KFTPD_HOMEDIR"); ok {
+		cfg.HomeDir, _ = strconv.ParseBool(env)
 	}
 
 	if env, ok := os.LookupEnv("KFTPD_DEBUG"); ok {
@@ -1606,8 +1617,8 @@ func NewFtpdConfig() *FtpdConfig {
 		cfg.Port.ConnectTimeout, _ = strconv.Atoi(env)
 	}
 
-	if env, ok := os.LookupEnv("KFTPD_FILEDRIVER_ROOTPATH"); ok {
-		cfg.FileDriver.RootPath = env
+	if env, ok := os.LookupEnv("KFTPD_FILEDRIVER_BASEDIR"); ok {
+		cfg.FileDriver.BaseDir = env
 	}
 
 	if env, ok := os.LookupEnv("KFTPD_MINIODRIVER_ENDPOINT"); ok {
@@ -1688,7 +1699,7 @@ func FtpdServe(config *FtpdConfig) error {
 
 	switch config.Driver {
 	case "file":
-		factory = NewFileDriverFactory(config.FileDriver.RootPath)
+		factory = NewFileDriverFactory(config.FileDriver.BaseDir)
 	case "minio":
 		factory = NewMinioDriverFactory(config.MinioDriver.Endpoint, config.MinioDriver.AccessKeyID, config.MinioDriver.SecretAccessKey, config.MinioDriver.Bucket, config.MinioDriver.UseSSL)
 	case "custom":

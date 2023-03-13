@@ -12,6 +12,11 @@ Bind: :21
 # ENV KFTPD_DRIVER
 Driver: file
 
+# KFtpd Home Dir, if enabled use user as home dir name
+# 
+# ENV KFTPD_HOMEDIR
+HomeDir: true
+
 # KFtpd enable debug
 #
 # ENV KFTPD_DEBUG
