@@ -4,7 +4,8 @@ WORKDIR /app
 
 COPY . .
 
-RUN go build -tags netgo -ldflags "-linkmode 'external' -extldflags '-static' -w -s" -o kftpd main/main.go
+RUN go env -w GOPROXY=https://goproxy.cn,https://goproxy.io,direct && \
+    go build -tags netgo -ldflags "-linkmode 'external' -extldflags '-static' -w -s" -o kftpd main/main.go
 
 FROM scratch
 COPY --from=gobuilder /app/kftpd .
