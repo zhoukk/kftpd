@@ -130,6 +130,9 @@ func (m *MinioFileInfo) Name() string {
 
 // Size return minio file size
 func (m *MinioFileInfo) Size() int64 {
+	if m.isDir {
+		return 4096
+	}
 	return m.object.Size
 }
 
@@ -143,6 +146,9 @@ func (m *MinioFileInfo) Mode() os.FileMode {
 
 // ModTime return minio file modify time
 func (m *MinioFileInfo) ModTime() time.Time {
+	if m.isDir {
+		return time.Now()
+	}
 	return m.object.LastModified
 }
 
@@ -194,14 +200,11 @@ func (driver *MinioDriver) miniopath(path string) string {
 // miniodir return dir path joined with user
 func (driver *MinioDriver) miniodir(path string) string {
 	dir := filepath.Join(driver.user, path)
-	if dir == "/" {
-		return dir
-	}
 	if !strings.HasSuffix(dir, "/") {
-		return dir + "/"
+		dir += "/"
 	}
-	if strings.HasPrefix(dir, "/") {
-		return strings.TrimPrefix(dir, "/")
+	if dir != "/" && strings.HasPrefix(dir, "/") {
+		dir = strings.TrimPrefix(dir, "/")
 	}
 	return dir
 }
@@ -381,7 +384,6 @@ func (driver *MinioDriver) ListDir(path string, callback func(FileInfo) error) e
 			object: object,
 			isDir:  strings.HasSuffix(object.Key, "/"),
 		}
-		log.Println(info)
 		err := callback(info)
 		if err != nil {
 			return err
