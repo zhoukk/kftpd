@@ -194,6 +194,9 @@ func (driver *MinioDriver) miniopath(path string) string {
 // miniodir return dir path joined with user
 func (driver *MinioDriver) miniodir(path string) string {
 	dir := filepath.Join(driver.user, path)
+	if dir == "/" {
+		return dir
+	}
 	if !strings.HasSuffix(dir, "/") {
 		return dir + "/"
 	}
