@@ -28,7 +28,7 @@ import (
 type FtpdConfig struct {
 	Bind    string `yaml:"Bind,omitempty"`
 	Driver  string `yaml:"Driver,omitempty"`
-	HomeDir bool   `yaml:"HOMEDIR,omitempty"`
+	HomeDir bool   `yaml:"HomeDir,omitempty"`
 	Debug   bool   `yaml:"Debug,omitempty"`
 
 	Pasv struct {
